@@ -103,8 +103,15 @@ def create_job():
         return _err("Text input fields must be strings.")
     if "royalty_free_only" in body and not isinstance(body["royalty_free_only"], bool):
         return _err("royalty_free_only must be a boolean.")
-    if "clip_seconds" in body and (not isinstance(body["clip_seconds"], int) or isinstance(body["clip_seconds"], bool)):
-        return _err("clip_seconds must be an integer.")
+    if "clip_seconds" in body:
+        clip_seconds = body["clip_seconds"]
+        if isinstance(clip_seconds, bool):
+            return _err("clip_seconds must be an integer.")
+        if isinstance(clip_seconds, str) and clip_seconds.strip().isdigit():
+            clip_seconds = int(clip_seconds.strip())
+            body["clip_seconds"] = clip_seconds
+        if not isinstance(clip_seconds, int):
+            return _err("clip_seconds must be an integer.")
     if "clip_seconds" in body and not 10 <= body["clip_seconds"] <= 60:
         return _err("clip_seconds must be from 10 to 60.")
     if "aspect" in body and body["aspect"] not in imagegen.ASPECTS:
