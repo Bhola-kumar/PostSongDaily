@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lyric Video Generator</title>
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --line:#2a2e38; --text:#e8eaf0; --mute:#9aa1b2; --accent:#ffd666; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 28px 16px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; } p.sub { color:var(--mute); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap:12px; }
+  label { display:block; font-size:12px; color:var(--mute); margin-bottom:4px; }
+  input, select, textarea { width:100%; background:#10131a; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px 10px; font:inherit; }
+  textarea { resize: vertical; min-height: 90px; }
+  button { background:var(--accent); color:#1a1500; border:0; border-radius:8px; padding:10px 18px; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); padding:5px 10px; font-weight:500; font-size:12px; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+  .bar { height:8px; background:#10131a; border-radius:99px; overflow:hidden; border:1px solid var(--line); }
+  .bar > div { height:100%; width:0; background:var(--accent); transition:width .4s; }
+  #status { color:var(--mute); margin-top:8px; min-height:22px; }
+  #err { color:#ff8b8b; }
+  .result { display:grid; grid-template-columns: minmax(220px,340px) 1fr; gap:18px; }
+  @media (max-width:720px){ .result { grid-template-columns:1fr; } }
+  video { width:100%; border-radius:10px; background:#000; }
+  .field { margin-bottom:12px; } .field .head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .hidden { display:none; } a { color:var(--accent); }
+  .chk { display:flex; gap:8px; align-items:center; margin-top:22px; } .chk input { width:auto; }
+  small { color:var(--mute); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Lyric Video Generator</h1>
+  <p class="sub">Pick the vibe → song, lyrics, artwork, animated lyric video, title, description and tags.</p>
+
+  <form id="form" class="card">
+    <div class="grid">
+      <div><label>Mood</label>
+        <select name="mood"><option value="any">any</option></select></div>
+      <div><label>Genre</label><input name="genre" placeholder="pop, rock, lofi, hip hop…"></div>
+      <div><label>Language</label>
+        <select name="language">
+          <option>english</option><option>hindi</option><option>punjabi</option><option>spanish</option>
+          <option>korean</option><option>japanese</option><option>french</option><option>portuguese</option>
+        </select></div>
+      <div><label>Era</label>
+        <select name="era"><option value="any">any</option><option>2020s</option><option>2010s</option><option>2000s</option><option>90s</option><option>80s</option></select></div>
+      <div><label>Energy</label>
+        <select name="energy"><option value="any">any</option><option>low</option><option>medium</option><option>high</option></select></div>
+      <div><label>Keyword / theme</label><input name="keyword" placeholder="rain, road trip, summer…"></div>
+      <div><label>Artist (optional)</label><input name="artist"></div>
+      <div><label>Image / video format</label>
+        <select name="aspect"><option value="portrait">Instagram 4:5 (1080×1350)</option><option value="square">Square 1:1</option><option value="story">Reels / Shorts 9:16</option></select></div>
+      <div><label>Clip length (sec)</label><input name="clip_seconds" type="number" min="10" max="60" value="30"></div>
+      <label class="chk"><input type="checkbox" name="royalty_free_only"> Royalty-free tracks only (Jamendo)</label>
+    </div>
+    <div class="row"><button id="go" type="submit">Generate video</button><small id="quota"></small></div>
+    <div class="bar" style="margin-top:14px"><div id="fill"></div></div>
+    <div id="status"></div><div id="err"></div>
+  </form>
+
+  <section id="out" class="card hidden">
+    <div class="result">
+      <div><video id="vid" controls playsinline></video>
+        <div class="row"><a id="dlv" download>Download video</a><a id="dli" download>Download image</a><a id="dla" download>Audio clip</a></div></div>
+      <div>
+        <div class="field"><div class="head"><label>Title</label><button class="ghost" data-copy="f-title">Copy</button></div><input id="f-title"></div>
+        <div class="field"><div class="head"><label>Description</label><button class="ghost" data-copy="f-desc">Copy</button></div><textarea id="f-desc" rows="6"></textarea></div>
+        <div class="field"><div class="head"><label>Tags (comma separated)</label><button class="ghost" data-copy="f-tags">Copy</button></div><textarea id="f-tags" rows="3"></textarea></div>
+        <small id="info"></small>
+      </div>
+    </div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const form = $('#form'), go = $('#go');
+
+fetch('/api/options').then(r => r.json()).then(o => {
+  const sel = form.mood; o.moods.forEach(m => sel.add(new Option(m, m)));
+});
+fetch('/api/health').then(r => r.json()).then(h => {
+  $('#quota').textContent = `Today: ${h.jobs_today}/${h.daily_limit} jobs` + (h.ffmpeg ? '' : ` · ${h.ffmpeg_error || 'ffmpeg missing!'}`) + (h.gemini_key ? '' : ' · no Gemini key (template metadata)');
+});
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  $('#err').textContent = ''; $('#out').classList.add('hidden');
+  const fd = new FormData(form), body = Object.fromEntries(fd.entries());
+  body.royalty_free_only = form.royalty_free_only.checked;
+  go.disabled = true; $('#fill').style.width = '2%'; $('#status').textContent = 'Starting…';
+  const r = await fetch('/api/jobs', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) { $('#err').textContent = j.error || 'Request failed'; go.disabled = false; return; }
+  poll(j.job_id);
+});
+
+async function poll(id) {
+  const j = await (await fetch('/api/jobs/' + id)).json();
+  $('#fill').style.width = Math.round((j.progress || 0) * 100) + '%';
+  $('#status').textContent = j.message || j.step;
+  if (j.status === 'done') return show(j);
+  if (j.status === 'error') { $('#err').textContent = 'Failed: ' + j.error; go.disabled = false; return; }
+  setTimeout(() => poll(id), 1500);
+}
+
+function show(j) {
+  go.disabled = false;
+  const m = j.result.metadata, t = j.result.track;
+  $('#vid').src = j.urls.video; $('#dlv').href = j.urls.video; $('#dli').href = j.urls.image; $('#dla').href = j.urls.audio;
+  $('#f-title').value = m.title; $('#f-desc').value = m.description; $('#f-tags').value = m.tags.join(', ');
+  $('#info').textContent = `${t.title} – ${t.artist} (${t.provider}) · lyrics: ${j.result.lyrics.sync_mode} · image: ${j.result.image.provider} · metadata: ${m.generated_by}`;
+  $('#out').classList.remove('hidden');
+  $('#out').scrollIntoView({ behavior: 'smooth' });
+}
+
+document.addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.copy;
+  if (id) { e.preventDefault(); navigator.clipboard.writeText($('#' + id).value); e.target.textContent = 'Copied'; setTimeout(() => e.target.textContent = 'Copy', 1200); }
+});
+</script>
+</body>
+</html>

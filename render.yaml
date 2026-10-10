@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: videogen-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/healthz
+    numInstances: 1
+    disk:
+      name: videogen-data
+      mountPath: /var/data
+      sizeGB: 10
+    envVars:
+      - key: OUTPUT_DIR
+        value: /var/data/outputs
+      - key: API_KEY
+        generateValue: true
+      - key: DAILY_LIMIT
+        value: "30"
+      - key: MAX_BATCH_SIZE
+        value: "5"

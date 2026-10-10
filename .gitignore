@@ -1,0 +1,11 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+outputs/
+
+# ffmpeg binaries are large (often >100 MB each, which GitHub rejects). Keep them local.
+# Remove these two lines if you really want to commit them (use Git LFS for files over 100 MB).
+ffmpeg/*
+!ffmpeg/README.md
